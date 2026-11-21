@@ -1,0 +1,42 @@
+name: "LikeC4 architecture model"
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'likec4/**'
+      - 'kubernetes-manifests/**'
+      - '.github/workflows/likec4-model-ci.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'likec4/**'
+      - 'kubernetes-manifests/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  model:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: likec4
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: likec4/package-lock.json
+      - run: npm ci
+      - name: Validate model syntax
+        run: npm run validate
+      - name: Check model has not drifted from kubernetes-manifests
+        run: npm run check:drift
+      - name: Build static site
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: architecture-site
+          path: likec4/dist

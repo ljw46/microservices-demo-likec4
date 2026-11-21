@@ -1,0 +1,16 @@
+views {
+  view index {
+    title 'Landscape'
+    include *
+  }
+
+  view services of boutique {
+    title 'Services'
+    include *, boutique.*
+  }
+
+  view checkout of boutique.checkoutservice {
+    title 'Checkout dependencies'
+    include *, boutique.checkoutservice -> boutique.*
+  }
+}

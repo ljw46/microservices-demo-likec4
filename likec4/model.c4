@@ -1,0 +1,54 @@
+// SOURCE OF TRUTH: kubernetes-manifests/*.yaml
+// Every `service`/`datastore` must map to a Deployment and every relationship
+// to a *_ADDR env var. Enforced in CI by likec4/scripts/check-drift.mjs.
+// Element id == Deployment name, unless `metadata { deployment '...' }` says otherwise.
+
+model {
+  customer = actor 'Customer' {
+    description 'Browses and buys products'
+  }
+
+  boutique = system 'Online Boutique' {
+    frontend = service 'Frontend' { technology 'Go' }
+    cartservice = service 'Cart Service' { technology 'C#' }
+    productcatalogservice = service 'Product Catalog Service' { technology 'Go' }
+    currencyservice = service 'Currency Service' { technology 'Node.js' }
+    paymentservice = service 'Payment Service' { technology 'Node.js' }
+    shippingservice = service 'Shipping Service' { technology 'Go' }
+    emailservice = service 'Email Service' { technology 'Python' }
+    checkoutservice = service 'Checkout Service' { technology 'Go' }
+    recommendationservice = service 'Recommendation Service' { technology 'Python' }
+    adservice = service 'Ad Service' { technology 'Java' }
+    loadgenerator = service 'Load Generator' { technology 'Python/Locust' }
+    rediscart = datastore 'Redis (cart)' {
+      technology 'Redis'
+      metadata { deployment 'redis-cart' }
+    }
+    shoppingassistantservice = service 'Shopping Assistant Service' {
+      #optional
+      technology 'Python'
+    }
+  }
+
+  customer -> boutique.frontend 'uses' { technology 'HTTP' }
+  boutique.loadgenerator -[http]-> boutique.frontend 'generates traffic'
+
+  boutique.frontend -[grpc]-> boutique.productcatalogservice
+  boutique.frontend -[grpc]-> boutique.currencyservice
+  boutique.frontend -[grpc]-> boutique.cartservice
+  boutique.frontend -[grpc]-> boutique.recommendationservice
+  boutique.frontend -[grpc]-> boutique.shippingservice
+  boutique.frontend -[grpc]-> boutique.checkoutservice
+  boutique.frontend -[grpc]-> boutique.adservice
+  boutique.frontend -[grpc]-> boutique.shoppingassistantservice { #optional }
+
+  boutique.checkoutservice -[grpc]-> boutique.productcatalogservice
+  boutique.checkoutservice -[grpc]-> boutique.shippingservice
+  boutique.checkoutservice -[grpc]-> boutique.paymentservice
+  boutique.checkoutservice -[grpc]-> boutique.emailservice
+  boutique.checkoutservice -[grpc]-> boutique.currencyservice
+  boutique.checkoutservice -[grpc]-> boutique.cartservice
+
+  boutique.recommendationservice -[grpc]-> boutique.productcatalogservice
+  boutique.cartservice -[tcp]-> boutique.rediscart
+}

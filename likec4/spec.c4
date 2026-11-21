@@ -1,0 +1,25 @@
+specification {
+  element actor
+  element system
+  element service {
+    notation 'Microservice (Deployment in kubernetes-manifests/)'
+    style { shape component }
+  }
+  element datastore {
+    style { shape cylinder }
+  }
+
+  tag optional   // not in the base manifests (kustomize component); ignored by drift check
+
+  relationship grpc {
+    technology 'gRPC'
+    line solid
+  }
+  relationship http {
+    technology 'HTTP'
+    line dashed
+  }
+  relationship tcp {
+    technology 'TCP'
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "online-boutique-architecture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "likec4 start",
+    "validate": "likec4 validate",
+    "build": "likec4 build -o dist",
+    "export:json": "likec4 export json --skip-layout -o model.json",
+    "check:drift": "npm run export:json && node scripts/check-drift.mjs"
+  },
+  "devDependencies": {
+    "likec4": "^1.61.0",
+    "yaml": "^2.8.0"
+  }
+}
