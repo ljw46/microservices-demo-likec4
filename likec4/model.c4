@@ -27,6 +27,10 @@ model {
     shoppingassistantservice = service 'Shopping Assistant Service' {
       #optional
       technology 'Python'
+      description 'Optional: kustomize component, not in base manifests'
+      style {
+        color red
+      }
     }
   }
 

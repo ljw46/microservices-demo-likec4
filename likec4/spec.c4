@@ -1,18 +1,21 @@
 specification {
-  element actor
+  element actor {
+    style { shape person; color muted }
+  }
   element system
   element service {
     notation 'Microservice (Deployment in kubernetes-manifests/)'
-    style { shape component }
+    style { shape component; color primary }
   }
   element datastore {
-    style { shape cylinder }
+    style { shape cylinder; color amber }
   }
 
-  tag optional   // not in the base manifests (kustomize component); ignored by drift check
+  // not in the base manifests (kustomize component); ignored by drift check
+  tag optional
 
   relationship grpc {
-    technology 'gRPC'
+    // no technology: keeps the many gRPC edges free of repeated labels
     line solid
   }
   relationship http {

@@ -1,16 +1,21 @@
 views {
   view index {
-    title 'Landscape'
-    include *
+    title 'Landscape: entry points'
+    description 'Who talks to the boutique, and through what'
+    include customer, boutique, boutique.frontend, boutique.loadgenerator
+    autoLayout TopBottom
   }
 
   view services of boutique {
     title 'Services'
+    description 'All services and datastores. Red = optional component'
     include *, boutique.*
+    autoLayout TopBottom 90 70
   }
 
   view checkout of boutique.checkoutservice {
     title 'Checkout dependencies'
     include *, boutique.checkoutservice -> boutique.*
+    autoLayout TopBottom
   }
 }
