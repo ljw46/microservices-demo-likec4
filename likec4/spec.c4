@@ -1,14 +1,26 @@
+// C4 vocabulary: person / softwareSystem (L1), container (L2), component (L3).
 specification {
-  element actor {
+  element person {
     style { shape person; color muted }
   }
-  element system
-  element service {
-    notation 'Microservice (Deployment in kubernetes-manifests/)'
-    style { shape component; color primary }
+  element softwareSystem {
+    style { color primary }
   }
-  element datastore {
+  element externalSystem {
+    notation 'External / supporting system'
+    style { color muted }
+  }
+  element container {
+    notation 'Container: separately deployable (Deployment in kubernetes-manifests/)'
+    style { shape rectangle; color primary }
+  }
+  element database {
+    notation 'Container: data store'
     style { shape cylinder; color amber }
+  }
+  element component {
+    notation 'Component: grouping of code inside a container (src/)'
+    style { shape rectangle; color sky }
   }
 
   // not in the base manifests (kustomize component); ignored by drift check
@@ -24,5 +36,6 @@ specification {
   }
   relationship tcp {
     technology 'TCP'
+    line dotted
   }
 }

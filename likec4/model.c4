@@ -1,41 +1,95 @@
 // SOURCE OF TRUTH: kubernetes-manifests/*.yaml
-// Every `service`/`datastore` must map to a Deployment and every relationship
-// to a *_ADDR env var. Enforced in CI by likec4/scripts/check-drift.mjs.
+// Every container/database (and the load generator) must map to a Deployment, and every
+// container-to-container relationship to a *_ADDR env var. Component-level relationships
+// are lifted to their container. Enforced in CI by likec4/scripts/check-drift.mjs.
 // Element id == Deployment name, unless `metadata { deployment '...' }` says otherwise.
 
 model {
-  customer = actor 'Customer' {
+  // ---- L1: system context ----
+  customer = person 'Customer' {
     description 'Browses and buys products'
   }
+  loadgenerator = externalSystem 'Load Generator' {
+    description 'Locust traffic simulator'
+    technology 'Python/Locust'
+    metadata { deployment 'loadgenerator' }
+  }
 
-  boutique = system 'Online Boutique' {
-    frontend = service 'Frontend' { technology 'Go' }
-    cartservice = service 'Cart Service' { technology 'C#' }
-    productcatalogservice = service 'Product Catalog Service' { technology 'Go' }
-    currencyservice = service 'Currency Service' { technology 'Node.js' }
-    paymentservice = service 'Payment Service' { technology 'Node.js' }
-    shippingservice = service 'Shipping Service' { technology 'Go' }
-    emailservice = service 'Email Service' { technology 'Python' }
-    checkoutservice = service 'Checkout Service' { technology 'Go' }
-    recommendationservice = service 'Recommendation Service' { technology 'Python' }
-    adservice = service 'Ad Service' { technology 'Java' }
-    loadgenerator = service 'Load Generator' { technology 'Python/Locust' }
-    rediscart = datastore 'Redis (cart)' {
+  boutique = softwareSystem 'Online Boutique' {
+    description 'Web shop: browse, add to cart, check out'
+
+    // ---- L2: containers ----
+    frontend = container 'Frontend' {
+      technology 'Go'
+      description 'Serves the web UI and calls the backend services'
+    }
+    cartservice = container 'Cart Service' { technology 'C#' }
+    productcatalogservice = container 'Product Catalog Service' { technology 'Go' }
+    currencyservice = container 'Currency Service' { technology 'Node.js' }
+    paymentservice = container 'Payment Service' { technology 'Node.js' }
+    shippingservice = container 'Shipping Service' { technology 'Go' }
+    emailservice = container 'Email Service' { technology 'Python' }
+    recommendationservice = container 'Recommendation Service' { technology 'Python' }
+    adservice = container 'Ad Service' { technology 'Java' }
+    rediscart = database 'Cart Store' {
       technology 'Redis'
       metadata { deployment 'redis-cart' }
     }
-    shoppingassistantservice = service 'Shopping Assistant Service' {
+    shoppingassistantservice = container 'Shopping Assistant Service' {
       #optional
       technology 'Python'
       description 'Optional: kustomize component, not in base manifests'
-      style {
-        color red
+      style { color red }
+    }
+
+    // ---- L3: components of the checkout service (src/checkoutservice/main.go) ----
+    checkoutservice = container 'Checkout Service' {
+      technology 'Go'
+      description 'Orchestrates order placement'
+
+      orderapi = component 'PlaceOrder API' {
+        technology 'gRPC handler'
+        description 'checkoutService.PlaceOrder'
       }
+      cartclient = component 'Cart Access' {
+        description 'getUserCart / emptyUserCart'
+      }
+      itempreparer = component 'Order Item Preparer' {
+        description 'prepOrderItems: price lookup and currency conversion'
+      }
+      shippingquoter = component 'Shipping Quoter' {
+        description 'quoteShipping'
+      }
+      payer = component 'Payment Charger' {
+        description 'chargeCard'
+      }
+      shipper = component 'Order Shipper' {
+        description 'shipOrder'
+      }
+      notifier = component 'Order Notifier' {
+        description 'sendOrderConfirmation'
+      }
+
+      orderapi -> cartclient 'loads and empties cart'
+      orderapi -> itempreparer 'prices items'
+      orderapi -> shippingquoter 'quotes shipping'
+      orderapi -> payer 'charges card'
+      orderapi -> shipper 'ships order'
+      orderapi -> notifier 'sends confirmation'
+
+      cartclient -[grpc]-> cartservice
+      itempreparer -[grpc]-> productcatalogservice
+      itempreparer -[grpc]-> currencyservice
+      shippingquoter -[grpc]-> shippingservice
+      payer -[grpc]-> paymentservice
+      shipper -[grpc]-> shippingservice
+      notifier -[grpc]-> emailservice
     }
   }
 
-  customer -> boutique.frontend 'uses' { technology 'HTTP' }
-  boutique.loadgenerator -[http]-> boutique.frontend 'generates traffic'
+  // ---- relationships ----
+  customer -[http]-> boutique.frontend 'browses and buys'
+  loadgenerator -[http]-> boutique.frontend 'generates traffic'
 
   boutique.frontend -[grpc]-> boutique.productcatalogservice
   boutique.frontend -[grpc]-> boutique.currencyservice
@@ -46,13 +100,7 @@ model {
   boutique.frontend -[grpc]-> boutique.adservice
   boutique.frontend -[grpc]-> boutique.shoppingassistantservice { #optional }
 
-  boutique.checkoutservice -[grpc]-> boutique.productcatalogservice
-  boutique.checkoutservice -[grpc]-> boutique.shippingservice
-  boutique.checkoutservice -[grpc]-> boutique.paymentservice
-  boutique.checkoutservice -[grpc]-> boutique.emailservice
-  boutique.checkoutservice -[grpc]-> boutique.currencyservice
-  boutique.checkoutservice -[grpc]-> boutique.cartservice
-
+  // checkoutservice's outgoing edges are declared at component level (L3) above
   boutique.recommendationservice -[grpc]-> boutique.productcatalogservice
   boutique.cartservice -[tcp]-> boutique.rediscart
 }

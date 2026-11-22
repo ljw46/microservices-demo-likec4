@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Fails (exit 1) when the LikeC4 model and kubernetes-manifests/ disagree.
-//   deployments  <->  service/datastore elements
+//   deployments  <->  container/database elements
 //   *_ADDR env vars (host:port)  <->  relationships between those elements
 // Elements/relationships tagged #optional are exempt (not in the base manifests).
 import { readFileSync, readdirSync } from 'node:fs'
@@ -40,14 +40,23 @@ let raw = JSON.parse(readFileSync(modelFile, 'utf8'))
 const model = Array.isArray(raw) ? raw[0] : raw
 const isOptional = x => (x.tags ?? []).includes('optional')
 const nameOf = e => e.metadata?.deployment ?? e.id.split('.').pop()
-const deployable = Object.values(model.elements).filter(e => ['service', 'datastore'].includes(e.kind))
+// deployable = C4 containers/databases, plus anything explicitly mapped to a Deployment
+const deployable = Object.values(model.elements).filter(
+  e => ['container', 'database'].includes(e.kind) || e.metadata?.deployment,
+)
 const byId = Object.fromEntries(deployable.map(e => [e.id, e]))
+// lift an element (e.g. an L3 component) to its nearest deployable ancestor-or-self
+const lift = id => {
+  for (let p = id; p; p = p.includes('.') ? p.slice(0, p.lastIndexOf('.')) : '') {
+    if (byId[p]) return byId[p]
+  }
+}
 
 const modelNodes = new Set(deployable.filter(e => !isOptional(e)).map(nameOf))
 const modelEdges = new Set()
 for (const r of Object.values(model.relations)) {
-  const s = byId[r.source.model], t = byId[r.target.model]
-  if (!s || !t || isOptional(r) || isOptional(s) || isOptional(t)) continue
+  const s = lift(r.source.model), t = lift(r.target.model)
+  if (!s || !t || s === t || isOptional(r) || isOptional(s) || isOptional(t)) continue
   modelEdges.add(`${nameOf(s)} -> ${nameOf(t)}`)
 }
 
