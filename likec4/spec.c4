@@ -1,18 +1,27 @@
-// C4 vocabulary: person / softwareSystem (L1), container (L2), component (L3).
+// C4 vocabulary: person / application (L1), microservice + database (L2), component (L3).
 specification {
   element person {
     style { shape person; color muted }
   }
-  element softwareSystem {
+  // C4 "software system" == the deployable application as a whole
+  element application {
+    notation 'Application (C4 software system)'
     style { color primary }
   }
   element externalSystem {
     notation 'External / supporting system'
     style { color muted }
   }
-  element container {
-    notation 'Container: separately deployable (Deployment in kubernetes-manifests/)'
-    style { shape rectangle; color primary }
+  // C4 has no mandated shape for a microservice; hexagon is the common convention.
+  // LikeC4 has no hexagon shape, so it is drawn with a custom icon.
+  element microservice {
+    notation 'Microservice: separately deployable container (Deployment in kubernetes-manifests/)'
+    style {
+      shape rectangle
+      color primary
+      icon ./icons/microservice.svg
+      iconPosition left
+    }
   }
   element database {
     notation 'Container: data store'

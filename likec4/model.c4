@@ -1,6 +1,6 @@
 // SOURCE OF TRUTH: kubernetes-manifests/*.yaml
-// Every container/database (and the load generator) must map to a Deployment, and every
-// container-to-container relationship to a *_ADDR env var. Component-level relationships
+// Every microservice/database (and the load generator) must map to a Deployment, and every
+// service-to-service relationship to a *_ADDR env var. Component-level relationships
 // are lifted to their container. Enforced in CI by likec4/scripts/check-drift.mjs.
 // Element id == Deployment name, unless `metadata { deployment '...' }` says otherwise.
 
@@ -12,39 +12,124 @@ model {
   loadgenerator = externalSystem 'Load Generator' {
     description 'Locust traffic simulator'
     technology 'Python/Locust'
-    metadata { deployment 'loadgenerator' }
+    metadata {
+      deployment 'loadgenerator'
+      source 'src/loadgenerator'
+    }
   }
 
-  boutique = softwareSystem 'Online Boutique' {
+  boutique = application 'Online Boutique' {
     description 'Web shop: browse, add to cart, check out'
+    technology 'Microservices on Kubernetes'
+    link https://github.com/GoogleCloudPlatform/microservices-demo 'Upstream project'
+    metadata {
+      repository 'github.com/GoogleCloudPlatform/microservices-demo'
+      platform 'Kubernetes'
+      architecture 'microservices'
+      protocol 'gRPC'
+    }
 
-    // ---- L2: containers ----
-    frontend = container 'Frontend' {
+    // ---- L2: containers (microservices + data store) ----
+    frontend = microservice 'Frontend' {
       technology 'Go'
+      metadata {
+        tier 'web'
+        port '8080'
+        source 'src/frontend'
+      }
       description 'Serves the web UI and calls the backend services'
     }
-    cartservice = container 'Cart Service' { technology 'C#' }
-    productcatalogservice = container 'Product Catalog Service' { technology 'Go' }
-    currencyservice = container 'Currency Service' { technology 'Node.js' }
-    paymentservice = container 'Payment Service' { technology 'Node.js' }
-    shippingservice = container 'Shipping Service' { technology 'Go' }
-    emailservice = container 'Email Service' { technology 'Python' }
-    recommendationservice = container 'Recommendation Service' { technology 'Python' }
-    adservice = container 'Ad Service' { technology 'Java' }
+    cartservice = microservice 'Cart Service' {
+      technology 'C#'
+      metadata {
+        tier 'backend'
+        port '7070'
+        source 'src/cartservice'
+      }
+    }
+    productcatalogservice = microservice 'Product Catalog Service' {
+      technology 'Go'
+      metadata {
+        tier 'backend'
+        port '3550'
+        source 'src/productcatalogservice'
+      }
+    }
+    currencyservice = microservice 'Currency Service' {
+      technology 'Node.js'
+      metadata {
+        tier 'backend'
+        port '7000'
+        source 'src/currencyservice'
+      }
+    }
+    paymentservice = microservice 'Payment Service' {
+      technology 'Node.js'
+      metadata {
+        tier 'backend'
+        port '50051'
+        source 'src/paymentservice'
+      }
+    }
+    shippingservice = microservice 'Shipping Service' {
+      technology 'Go'
+      metadata {
+        tier 'backend'
+        port '50051'
+        source 'src/shippingservice'
+      }
+    }
+    emailservice = microservice 'Email Service' {
+      technology 'Python'
+      metadata {
+        tier 'backend'
+        port '8080'
+        source 'src/emailservice'
+      }
+    }
+    recommendationservice = microservice 'Recommendation Service' {
+      technology 'Python'
+      metadata {
+        tier 'backend'
+        port '8080'
+        source 'src/recommendationservice'
+      }
+    }
+    adservice = microservice 'Ad Service' {
+      technology 'Java'
+      metadata {
+        tier 'backend'
+        port '9555'
+        source 'src/adservice'
+      }
+    }
     rediscart = database 'Cart Store' {
       technology 'Redis'
-      metadata { deployment 'redis-cart' }
+      metadata {
+        deployment 'redis-cart'
+        tier 'data'
+        port '6379'
+      }
     }
-    shoppingassistantservice = container 'Shopping Assistant Service' {
+    shoppingassistantservice = microservice 'Shopping Assistant Service' {
       #optional
       technology 'Python'
+      metadata {
+        tier 'backend'
+        source 'src/shoppingassistantservice'
+      }
       description 'Optional: kustomize component, not in base manifests'
       style { color red }
     }
 
     // ---- L3: components of the checkout service (src/checkoutservice/main.go) ----
-    checkoutservice = container 'Checkout Service' {
+    checkoutservice = microservice 'Checkout Service' {
       technology 'Go'
+      metadata {
+        tier 'backend'
+        port '5050'
+        source 'src/checkoutservice'
+      }
       description 'Orchestrates order placement'
 
       orderapi = component 'PlaceOrder API' {
