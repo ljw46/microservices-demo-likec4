@@ -1,0 +1,23 @@
+views {
+  // L1: System Context
+  view index {
+    title 'L1: System Context'
+    include customer, loadgenerator, boutique
+    autoLayout TopBottom
+  }
+
+  // L2: Containers
+  view containers of boutique {
+    title 'L2: Containers'
+    description 'Red = optional component (not in base manifests)'
+    include *
+    autoLayout TopBottom 90 70
+  }
+
+  // L3: Components
+  view checkout_components of boutique.checkoutservice {
+    title 'L3: Checkout Service components'
+    include *
+    autoLayout TopBottom
+  }
+}

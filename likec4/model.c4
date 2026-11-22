@@ -1,0 +1,191 @@
+// SOURCE OF TRUTH: kubernetes-manifests/*.yaml
+// Every microservice/database (and the load generator) must map to a Deployment, and every
+// service-to-service relationship to a *_ADDR env var. Component-level relationships
+// are lifted to their container. Enforced in CI by likec4/scripts/check-drift.mjs.
+// Element id == Deployment name, unless `metadata { deployment '...' }` says otherwise.
+
+model {
+  // ---- L1: system context ----
+  customer = person 'Customer' {
+    description 'Browses and buys products'
+  }
+  loadgenerator = externalSystem 'Load Generator' {
+    description 'Locust traffic simulator'
+    technology 'Python/Locust'
+    metadata {
+      deployment 'loadgenerator'
+      source 'src/loadgenerator'
+    }
+  }
+
+  boutique = application 'Online Boutique' {
+    description 'Web shop: browse, add to cart, check out'
+    technology 'Microservices on Kubernetes'
+    link https://github.com/GoogleCloudPlatform/microservices-demo 'Upstream project'
+    metadata {
+      repository 'github.com/GoogleCloudPlatform/microservices-demo'
+      platform 'Kubernetes'
+      architecture 'microservices'
+      protocol 'gRPC'
+    }
+
+    // ---- L2: containers (microservices + data store) ----
+    frontend = microservice 'Frontend' {
+      technology 'Go'
+      metadata {
+        tier 'web'
+        port '8080'
+        source 'src/frontend'
+      }
+      description 'Serves the web UI and calls the backend services'
+    }
+    cartservice = microservice 'Cart Service' {
+      technology 'C#'
+      metadata {
+        tier 'backend'
+        port '7070'
+        source 'src/cartservice'
+      }
+    }
+    productcatalogservice = microservice 'Product Catalog Service' {
+      technology 'Go'
+      metadata {
+        tier 'backend'
+        port '3550'
+        source 'src/productcatalogservice'
+      }
+    }
+    currencyservice = microservice 'Currency Service' {
+      technology 'Node.js'
+      metadata {
+        tier 'backend'
+        port '7000'
+        source 'src/currencyservice'
+      }
+    }
+    paymentservice = microservice 'Payment Service' {
+      technology 'Node.js'
+      metadata {
+        tier 'backend'
+        port '50051'
+        source 'src/paymentservice'
+      }
+    }
+    shippingservice = microservice 'Shipping Service' {
+      technology 'Go'
+      metadata {
+        tier 'backend'
+        port '50051'
+        source 'src/shippingservice'
+      }
+    }
+    emailservice = microservice 'Email Service' {
+      technology 'Python'
+      metadata {
+        tier 'backend'
+        port '8080'
+        source 'src/emailservice'
+      }
+    }
+    recommendationservice = microservice 'Recommendation Service' {
+      technology 'Python'
+      metadata {
+        tier 'backend'
+        port '8080'
+        source 'src/recommendationservice'
+      }
+    }
+    adservice = microservice 'Ad Service' {
+      technology 'Java'
+      metadata {
+        tier 'backend'
+        port '9555'
+        source 'src/adservice'
+      }
+    }
+    rediscart = database 'Cart Store' {
+      technology 'Redis'
+      metadata {
+        deployment 'redis-cart'
+        tier 'data'
+        port '6379'
+      }
+    }
+    shoppingassistantservice = microservice 'Shopping Assistant Service' {
+      #optional
+      technology 'Python'
+      metadata {
+        tier 'backend'
+        source 'src/shoppingassistantservice'
+      }
+      description 'Optional: kustomize component, not in base manifests'
+      style { color red }
+    }
+
+    // ---- L3: components of the checkout service (src/checkoutservice/main.go) ----
+    checkoutservice = microservice 'Checkout Service' {
+      technology 'Go'
+      metadata {
+        tier 'backend'
+        port '5050'
+        source 'src/checkoutservice'
+      }
+      description 'Orchestrates order placement'
+
+      orderapi = component 'PlaceOrder API' {
+        technology 'gRPC handler'
+        description 'checkoutService.PlaceOrder'
+      }
+      cartclient = component 'Cart Access' {
+        description 'getUserCart / emptyUserCart'
+      }
+      itempreparer = component 'Order Item Preparer' {
+        description 'prepOrderItems: price lookup and currency conversion'
+      }
+      shippingquoter = component 'Shipping Quoter' {
+        description 'quoteShipping'
+      }
+      payer = component 'Payment Charger' {
+        description 'chargeCard'
+      }
+      shipper = component 'Order Shipper' {
+        description 'shipOrder'
+      }
+      notifier = component 'Order Notifier' {
+        description 'sendOrderConfirmation'
+      }
+
+      orderapi -> cartclient 'loads and empties cart'
+      orderapi -> itempreparer 'prices items'
+      orderapi -> shippingquoter 'quotes shipping'
+      orderapi -> payer 'charges card'
+      orderapi -> shipper 'ships order'
+      orderapi -> notifier 'sends confirmation'
+
+      cartclient -[grpc]-> cartservice
+      itempreparer -[grpc]-> productcatalogservice
+      itempreparer -[grpc]-> currencyservice
+      shippingquoter -[grpc]-> shippingservice
+      payer -[grpc]-> paymentservice
+      shipper -[grpc]-> shippingservice
+      notifier -[grpc]-> emailservice
+    }
+  }
+
+  // ---- relationships ----
+  customer -[http]-> boutique.frontend 'browses and buys'
+  loadgenerator -[http]-> boutique.frontend 'generates traffic'
+
+  boutique.frontend -[grpc]-> boutique.productcatalogservice
+  boutique.frontend -[grpc]-> boutique.currencyservice
+  boutique.frontend -[grpc]-> boutique.cartservice
+  boutique.frontend -[grpc]-> boutique.recommendationservice
+  boutique.frontend -[grpc]-> boutique.shippingservice
+  boutique.frontend -[grpc]-> boutique.checkoutservice
+  boutique.frontend -[grpc]-> boutique.adservice
+  boutique.frontend -[grpc]-> boutique.shoppingassistantservice { #optional }
+
+  // checkoutservice's outgoing edges are declared at component level (L3) above
+  boutique.recommendationservice -[grpc]-> boutique.productcatalogservice
+  boutique.cartservice -[tcp]-> boutique.rediscart
+}

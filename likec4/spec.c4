@@ -1,0 +1,50 @@
+// C4 vocabulary: person / application (L1), microservice + database (L2), component (L3).
+specification {
+  element person {
+    style { shape person; color muted }
+  }
+  // C4 "software system" == the deployable application as a whole
+  element application {
+    notation 'Application (C4 software system)'
+    style { color primary }
+  }
+  element externalSystem {
+    notation 'External / supporting system'
+    style { color muted }
+  }
+  // C4 has no mandated shape for a microservice; hexagon is the common convention.
+  // LikeC4 has no hexagon shape, so it is drawn with a custom icon.
+  element microservice {
+    notation 'Microservice: separately deployable container (Deployment in kubernetes-manifests/)'
+    style {
+      shape rectangle
+      color primary
+      icon ./icons/microservice.svg
+      iconPosition left
+    }
+  }
+  element database {
+    notation 'Container: data store'
+    style { shape cylinder; color amber }
+  }
+  element component {
+    notation 'Component: grouping of code inside a container (src/)'
+    style { shape rectangle; color sky }
+  }
+
+  // not in the base manifests (kustomize component); ignored by drift check
+  tag optional
+
+  relationship grpc {
+    // no technology: keeps the many gRPC edges free of repeated labels
+    line solid
+  }
+  relationship http {
+    technology 'HTTP'
+    line dashed
+  }
+  relationship tcp {
+    technology 'TCP'
+    line dotted
+  }
+}
